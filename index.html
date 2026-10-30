@@ -50,6 +50,7 @@ h1{font-size:26px;letter-spacing:.28em;margin:4px 0;color:#dff8ff}#clock{font-va
 </section>
 <div class="grid">
  <section class="panel"><h2>SYSTEM STATUS</h2><div class="value" id="sys">All local systems nominal</div><div class="muted" id="browser">Checking voice support...</div></section>
+ <section class="panel"><h2>AI ENGINE READINESS</h2><div class="value" id="aiReady">Not checked</div><div class="muted" id="aiDetails">Check whether this browser supports on-device AI. No model will be downloaded.</div><button class="smallbtn" id="checkAI" type="button" style="margin-top:10px">CHECK DEVICE</button></section>
  <section class="panel"><h2>WEATHER</h2><div class="value" id="weather">Awaiting request</div><div class="muted">Say “weather in Pensacola” or another city.</div></section>
  <section class="panel"><h2>QUICK COMMANDS</h2><div class="muted">“What time is it?”<br>“What is today's date?”<br>“Calculate 18 times 7”<br>“Weather in Miami”<br>“Add reminder call the dentist”</div></section>
  <section class="panel chat"><h2 style="display:flex;align-items:center;justify-content:space-between">COMMUNICATIONS LOG <button class="smallbtn" id="clearChat" type="button">CLEAR</button></h2><div class="log" id="log"></div><div class="controls"><input id="command" placeholder="Type a command..." autocomplete="off"><button id="send">SEND</button></div></section>
@@ -107,6 +108,24 @@ let tasks=JSON.parse(localStorage.getItem('jarvis_tasks')||'[]');
 function renderTasks(){$('tasks').innerHTML='';tasks.forEach((t,i)=>{const li=document.createElement('li');const cb=document.createElement('input');cb.type='checkbox';cb.checked=t.done;cb.onchange=()=>{tasks[i].done=cb.checked;saveTasks()};const sp=document.createElement('span');sp.textContent=t.text;if(t.done)sp.style.textDecoration='line-through';const del=document.createElement('button');del.textContent='×';del.setAttribute('aria-label','Delete task');del.onclick=()=>{tasks.splice(i,1);saveTasks()};li.append(cb,sp,del);$('tasks').append(li)})}
 function addTask(t){if(!t.trim())return;tasks.push({text:t.trim(),done:false});saveTasks();reply('Reminder added: '+t.trim()+'.')}
 renderTasks();
+$('checkAI').onclick=async()=>{
+ const btn=$('checkAI'),ready=$('aiReady'),details=$('aiDetails');
+ btn.disabled=true;btn.textContent='CHECKING...';ready.textContent='Checking browser capabilities...';
+ const gpu=!!navigator.gpu;
+ const wasm=typeof WebAssembly==='object';
+ const memory=navigator.deviceMemory||null;
+ let storageText='Storage estimate unavailable';
+ try{
+  if(navigator.storage?.estimate){
+   const est=await navigator.storage.estimate();
+   const free=typeof est.quota==='number'&&typeof est.usage==='number'?Math.max(0,est.quota-est.usage):null;
+   if(free!==null)storageText='Approx. '+(free/1024/1024/1024).toFixed(1)+' GB browser storage quota available';
+  }
+ }catch(e){}
+ ready.textContent=gpu?'WebGPU detected':'WebGPU not detected';
+ details.textContent='WebGPU: '+(gpu?'available':'not available')+' · WebAssembly: '+(wasm?'available':'not available')+' · Device memory hint: '+(memory?memory+' GB':'not provided')+'. '+storageText+'. This is only a compatibility check; no AI model was downloaded.';
+ btn.textContent='CHECK AGAIN';btn.disabled=false;
+};
 async function handle(raw){
  const s=raw.trim();if(!s)return;addMsg(s,'user');$('command').value='';
  const q=s.toLowerCase();
