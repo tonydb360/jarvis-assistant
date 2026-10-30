@@ -52,7 +52,7 @@ h1{font-size:26px;letter-spacing:.28em;margin:4px 0;color:#dff8ff}#clock{font-va
  <section class="panel"><h2>SYSTEM STATUS</h2><div class="value" id="sys">All local systems nominal</div><div class="muted" id="browser">Checking voice support...</div></section>
  <section class="panel"><h2>WEATHER</h2><div class="value" id="weather">Awaiting request</div><div class="muted">Say “weather in Pensacola” or another city.</div></section>
  <section class="panel"><h2>QUICK COMMANDS</h2><div class="muted">“What time is it?”<br>“What is today's date?”<br>“Calculate 18 times 7”<br>“Weather in Miami”<br>“Add reminder call the dentist”</div></section>
- <section class="panel chat"><h2>COMMUNICATIONS LOG</h2><div class="log" id="log"><div class="msg jarvis">Good evening. JARVIS systems are online. Voice recognition works best in Chrome on Android. How may I assist you?</div></div><div class="controls"><input id="command" placeholder="Type a command..." autocomplete="off"><button id="send">SEND</button></div></section>
+ <section class="panel chat"><h2 style="display:flex;align-items:center;justify-content:space-between">COMMUNICATIONS LOG <button class="smallbtn" id="clearChat" type="button">CLEAR</button></h2><div class="log" id="log"></div><div class="controls"><input id="command" placeholder="Type a command..." autocomplete="off"><button id="send">SEND</button></div></section>
  <section class="panel"><h2>REMINDERS / TASKS</h2><div class="taskrow"><input id="taskInput" placeholder="Add a task or reminder"><button class="smallbtn" id="addTask">ADD</button></div><ul id="tasks"></ul><div class="muted">Tasks are saved on this device in this browser.</div></section>
 </div>
 <div class="footer">J.A.R.V.I.S. PERSONAL ASSISTANT // LOCAL BUILD 1.0</div>
@@ -62,7 +62,32 @@ const $=id=>document.getElementById(id);
 function tick(){const d=new Date();$('clock').textContent=d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});$('date').textContent=d.toLocaleDateString([], {weekday:'long',year:'numeric',month:'long',day:'numeric'});}
 tick();setInterval(tick,1000);
 const log=$('log');
-function addMsg(text,who='jarvis'){const el=document.createElement('div');el.className='msg '+who;el.textContent=text;log.appendChild(el);log.scrollTop=log.scrollHeight;}
+const CHAT_KEY='jarvis_conversation_v2';
+function saveConversation(){
+ const items=[...log.querySelectorAll('.msg')].slice(-100).map(el=>({text:el.textContent,who:el.classList.contains('user')?'user':'jarvis'}));
+ try{localStorage.setItem(CHAT_KEY,JSON.stringify(items))}catch(e){}
+}
+function addMsg(text,who='jarvis'){
+ const el=document.createElement('div');el.className='msg '+who;el.textContent=text;log.appendChild(el);
+ while(log.children.length>100)log.removeChild(log.firstChild);
+ log.scrollTop=log.scrollHeight;saveConversation();
+}
+function restoreConversation(){
+ try{
+  const saved=JSON.parse(localStorage.getItem(CHAT_KEY)||'null');
+  if(Array.isArray(saved)&&saved.length){
+   saved.slice(-100).forEach(item=>{if(item&&typeof item.text==='string'){const el=document.createElement('div');el.className='msg '+(item.who==='user'?'user':'jarvis');el.textContent=item.text;log.appendChild(el)}});
+  }
+ }catch(e){localStorage.removeItem(CHAT_KEY)}
+ if(!log.children.length)addMsg('Good evening. JARVIS systems are online. Voice recognition works best in Chrome on Android. How may I assist you?');
+ log.scrollTop=log.scrollHeight;
+}
+restoreConversation();
+$('clearChat').onclick=()=>{
+ if(!confirm('Clear the conversation saved on this device?'))return;
+ log.innerHTML='';localStorage.removeItem(CHAT_KEY);
+ addMsg('Conversation cleared. JARVIS is ready for a fresh session.');
+};
 function speak(text){if(!('speechSynthesis'in window))return; speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='en-GB';u.rate=.96;u.pitch=.92;speechSynthesis.speak(u);}
 function reply(text,voice=true){addMsg(text);if(voice)speak(text);}
 function cleanCalc(s){if(!/^[\d\s.+\-*/()%]+$/.test(s))return null;try{const v=Function('"use strict";return ('+s+')')();return Number.isFinite(v)?v:null}catch{return null}}
