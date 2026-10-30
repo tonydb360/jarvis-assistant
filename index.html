@@ -149,16 +149,15 @@ async function handle(raw){
  reply('I have received your request. My advanced language intelligence is not connected yet, so I can currently handle time, date, weather, calculations, and reminders. Say “help” for supported commands.');
 }
 $('send').onclick=()=>handle($('command').value);
-async function askChatGPT(){
+function askChatGPT(){
  const question=$('command').value.trim();
  if(!question){reply('Please enter a question first, then select Ask ChatGPT.',false);return}
- try{
-  await navigator.clipboard.writeText(question);
-  reply('Your question has been copied. I am opening ChatGPT now. Paste it into your ChatGPT conversation, then copy its answer back here.',false);
- }catch(e){
-  reply('I could not copy automatically. Your question is still in the input box; copy it manually, then paste it into ChatGPT.',false);
- }
  window.open('https://chatgpt.com/','_blank','noopener');
+ navigator.clipboard.writeText(question).then(()=>{
+  reply('Your question has been copied. Paste it into your ChatGPT conversation. When ChatGPT answers, copy its reply and paste it here starting with JARVIS REPLY: so I can speak it aloud.',false);
+ }).catch(()=>{
+  reply('Automatic copying was blocked. Your question is still in the input box; copy it manually and paste it into ChatGPT. After the answer, paste it here starting with JARVIS REPLY:.',false);
+ });
 }
 $('askChatGPT').onclick=askChatGPT;
 $('command').addEventListener('keydown',e=>{if(e.key==='Enter')handle($('command').value)});
