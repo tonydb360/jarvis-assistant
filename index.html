@@ -46,14 +46,14 @@ h1{font-size:26px;letter-spacing:.28em;margin:4px 0;color:#dff8ff}#clock{font-va
  <div class="orb-wrap"><div class="ring three"></div><div class="ring"></div><div class="ring two"></div><div class="orb"></div></div>
  <h1>J.A.R.V.I.S.</h1><div id="clock">--:--:--</div><div id="date">INITIALIZING DATE...</div>
  <div class="tagline">At your service. How may I assist?</div>
- <button class="mic" id="micBtn">🎙 ACTIVATE VOICE</button><div id="heard">Voice recognition is ready when your browser supports it.</div>
+ <div style="display:flex;gap:9px;justify-content:center;flex-wrap:wrap"><button class="mic" id="micBtn">🎙 ACTIVATE VOICE</button><button class="mic" id="voiceChatBtn" type="button">🎙 VOICE TO CHATGPT</button></div><div id="heard">Voice recognition is ready when your browser supports it.</div>
 </section>
 <div class="grid">
  <section class="panel"><h2>SYSTEM STATUS</h2><div class="value" id="sys">All local systems nominal</div><div class="muted" id="browser">Checking voice support...</div></section>
  <section class="panel"><h2>AI ENGINE READINESS</h2><div class="value" id="aiReady">Not checked</div><div class="muted" id="aiDetails">Check whether this browser supports on-device AI. No model will be downloaded.</div><button class="smallbtn" id="checkAI" type="button" style="margin-top:10px">CHECK DEVICE</button></section>
  <section class="panel"><h2>WEATHER</h2><div class="value" id="weather">Awaiting request</div><div class="muted">Say “weather in Pensacola” or another city.</div></section>
  <section class="panel"><h2>QUICK COMMANDS</h2><div class="muted">“What time is it?”<br>“What is today's date?”<br>“Calculate 18 times 7”<br>“Weather in Miami”<br>“Add reminder call the dentist”</div></section>
- <section class="panel chat"><h2 style="display:flex;align-items:center;justify-content:space-between">COMMUNICATIONS LOG <button class="smallbtn" id="clearChat" type="button">CLEAR</button></h2><div class="log" id="log"></div><div class="controls"><input id="command" placeholder="Type a command..." autocomplete="off"><button id="send">SEND</button><button id="askChatGPT" type="button">ASK CHATGPT</button></div><div class="muted" style="margin-top:7px">ChatGPT Bridge: copies your question and opens your ChatGPT account. Paste the answer back here to hear JARVIS speak it.</div></section>
+ <section class="panel chat"><h2 style="display:flex;align-items:center;justify-content:space-between">COMMUNICATIONS LOG <button class="smallbtn" id="clearChat" type="button">CLEAR</button></h2><div class="log" id="log"></div><div class="controls"><input id="command" placeholder="Type a command..." autocomplete="off"><button id="send">SEND</button><button id="askChatGPT" type="button">SEND TO CHAT</button></div><div class="muted" style="margin-top:7px">ChatGPT Bridge: send typed questions or use Voice to ChatGPT. ChatGPT submission and replies still require your confirmation in ChatGPT.</div></section>
  <section class="panel"><h2>REMINDERS / TASKS</h2><div class="taskrow"><input id="taskInput" placeholder="Add a task or reminder"><button class="smallbtn" id="addTask">ADD</button></div><ul id="tasks"></ul><div class="muted">Tasks are saved on this device in this browser.</div></section>
 </div>
 <div class="footer">J.A.R.V.I.S. PERSONAL ASSISTANT // LOCAL BUILD 1.0</div>
@@ -163,13 +163,61 @@ $('askChatGPT').onclick=askChatGPT;
 $('command').addEventListener('keydown',e=>{if(e.key==='Enter')handle($('command').value)});
 $('addTask').onclick=()=>{const v=$('taskInput').value; $('taskInput').value='';addTask(v)};
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-if(SR){$('browser').textContent='Voice recognition supported';const rec=new SR();rec.lang='en-US';rec.interimResults=false;rec.maxAlternatives=1;let active=false;
- rec.onstart=()=>{active=true;$('micBtn').classList.add('listening');$('micBtn').textContent='● LISTENING...';$('heard').textContent='Listening. Speak now.';$('status').textContent='LISTENING'};
- rec.onresult=e=>{const t=e.results[0][0].transcript;$('heard').textContent='Heard: '+t;handle(t)};
+if(SR){
+ $('browser').textContent='Voice recognition supported';
+ const rec=new SR();rec.lang='en-US';rec.interimResults=true;rec.maxAlternatives=1;
+ let active=false,voiceChatMode=false,finalTranscript='';
+ rec.onstart=()=>{active=true;$('micBtn').classList.add('listening');$('micBtn').textContent='● LISTENING...';$('voiceChatBtn').classList.add('listening');$('heard').textContent='Listening. Finish your sentence and pause.';$('status').textContent='LISTENING'};
+ rec.onresult=e=>{
+  let interim='';
+  for(let i=e.resultIndex;i<e.results.length;i++){
+   const phrase=e.results[i][0].transcript;
+   if(e.results[i].isFinal)finalTranscript+=phrase+' ';
+   else interim+=phrase;
+  }
+  $('heard').textContent='Hearing: '+(finalTranscript+interim).trim();
+ };
  rec.onerror=e=>{$('heard').textContent='Voice input: '+e.error+'. You can type instead.'};
- rec.onend=()=>{active=false;$('micBtn').classList.remove('listening');$('micBtn').textContent='🎙 ACTIVATE VOICE';$('status').textContent='ONLINE'};
- $('micBtn').onclick=()=>{if(active)rec.stop();else{try{rec.start()}catch(e){$('heard').textContent='Please wait a moment and try again.'}}};
-}else{$('browser').textContent='Voice recognition unavailable in this browser';$('micBtn').disabled=true;$('micBtn').textContent='VOICE NOT SUPPORTED';$('heard').textContent='Try Chrome on Android, or use the text command box.'}
+ rec.onend=()=>{
+  active=false;$('micBtn').classList.remove('listening');$('micBtn').textContent='🎙 ACTIVATE VOICE';
+  $('voiceChatBtn').classList.remove('listening');$('voiceChatBtn').textContent='🎙 VOICE TO CHATGPT';$('status').textContent='ONLINE';
+  const transcript=finalTranscript.trim();finalTranscript='';
+  if(!transcript)return;
+  $('command').value=transcript;
+  if(voiceChatMode){
+   voiceChatMode=false;
+   navigator.clipboard.writeText(transcript).then(()=>{
+    addMsg('You (voice): '+transcript,'user');
+    reply('Your spoken question has been copied. Paste it into the ChatGPT tab that I opened. When ChatGPT replies, copy its answer and paste it here starting with JARVIS REPLY: and I will read it aloud.',false);
+    $('heard').textContent='Voice question ready for ChatGPT.';
+   }).catch(()=>{
+    addMsg('You (voice): '+transcript,'user');
+    reply('I heard you. Automatic copying was blocked, so your transcript is in the message box. Copy it into ChatGPT manually.',false);
+   });
+  }else{
+   $('heard').textContent='Heard: '+transcript;
+   handle(transcript);
+  }
+ };
+ $('micBtn').onclick=()=>{
+  voiceChatMode=false;
+  if(active){rec.stop();return}
+  finalTranscript='';
+  try{rec.start()}catch(e){$('heard').textContent='Please wait a moment and try again.'}
+ };
+ $('voiceChatBtn').onclick=()=>{
+  if(active){rec.stop();return}
+  voiceChatMode=true;finalTranscript='';
+  // Open the account page directly from the tap so the browser does not block the new tab.
+  window.open('https://chatgpt.com/','_blank','noopener');
+  try{rec.start()}catch(e){voiceChatMode=false;$('heard').textContent='Please wait a moment and try again.'}
+ };
+}else{
+ $('browser').textContent='Voice recognition unavailable in this browser';
+ $('micBtn').disabled=true;$('voiceChatBtn').disabled=true;
+ $('micBtn').textContent='VOICE NOT SUPPORTED';$('voiceChatBtn').textContent='VOICE NOT SUPPORTED';
+ $('heard').textContent='Try Chrome on Android, or use the text command box.';
+}
 if('serviceWorker'in navigator && location.protocol.startsWith('http'))window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 </script>
 </body></html>
