@@ -1,11 +1,13 @@
 {
-  "name": "JARVIS Personal Assistant",
+  "name": "J.A.R.V.I.S. — Personal Assistant",
   "short_name": "JARVIS",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#050c16",
   "theme_color": "#06111f",
-  "description": "A voice-first personal assistant inspired by a cinematic AI.",
+  "description": "A voice-first personal assistant with an Arc Reactor interface.",
   "icons": [
     {
       "src": "icon.svg",
