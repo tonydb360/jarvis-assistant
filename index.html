@@ -81,6 +81,7 @@ function restoreConversation(){
  log.scrollTop=log.scrollHeight;
 }
 restoreConversation();
+restoreAIMemory();
 $('clearChat').onclick=()=>{
  if(!confirm('Clear the conversation saved on this device?'))return;
  log.innerHTML='';localStorage.removeItem(CHAT_KEY);
@@ -103,8 +104,22 @@ function weatherName(c){if(c===0)return'clear';if([1,2,3].includes(c))return'par
 function saveTasks(){localStorage.setItem('jarvis_tasks',JSON.stringify(tasks));renderTasks()}
 let tasks=JSON.parse(localStorage.getItem('jarvis_tasks')||'[]');
 let localAIEngine=null;
+const AI_MEMORY_KEY='jarvis_local_ai_memory_v1';
+const AI_MEMORY_LIMIT=24;
 let localAIHistory=[];
 let localAIImport=null;
+function restoreAIMemory(){
+ try{
+  const saved=JSON.parse(localStorage.getItem(AI_MEMORY_KEY)||'[]');
+  if(Array.isArray(saved))localAIHistory=saved.filter(m=>m&&['user','assistant'].includes(m.role)&&typeof m.content==='string').slice(-AI_MEMORY_LIMIT);
+ }catch(e){localAIHistory=[]}
+}
+function saveAIMemory(){
+ try{localStorage.setItem(AI_MEMORY_KEY,JSON.stringify(localAIHistory.slice(-AI_MEMORY_LIMIT)))}catch(e){
+  $('aiProgress').textContent='AI is running, but browser storage could not save memory. Check device storage/settings.';
+ }
+}
+function clearAIMemory(){localAIHistory=[];try{localStorage.removeItem(AI_MEMORY_KEY)}catch(e){}}
 const LOCAL_AI_MODEL='Llama-3.2-1B-Instruct-q4f16_1-MLC';
 
 function renderTasks(){$('tasks').innerHTML='';tasks.forEach((t,i)=>{const li=document.createElement('li');const cb=document.createElement('input');cb.type='checkbox';cb.checked=t.done;cb.onchange=()=>{tasks[i].done=cb.checked;saveTasks()};const sp=document.createElement('span');sp.textContent=t.text;if(t.done)sp.style.textDecoration='line-through';const del=document.createElement('button');del.textContent='×';del.setAttribute('aria-label','Delete task');del.onclick=()=>{tasks.splice(i,1);saveTasks()};li.append(cb,sp,del);$('tasks').append(li)})}
@@ -181,11 +196,13 @@ async function handle(raw){
  if(q.includes('help')||q.includes('what can you do')){reply('I can tell you the time and date, look up current weather for a city, calculate arithmetic, and manage a local task list. Full open-ended AI conversation is not connected in this starter build.');return}
  if(localAIEngine){
   try{
-   const history=[{role:'system',content:'You are J.A.R.V.I.S., a helpful, calm, articulate personal assistant. Speak in concise, natural British English. Be honest about limitations. Do not claim to control phone functions or access live information unless a tool has done so.'},...localAIHistory.slice(-10),{role:'user',content:s}];
+   const history=[{role:'system',content:'You are J.A.R.V.I.S., a helpful, calm, articulate personal assistant. Speak in concise, natural British English. Be honest about limitations. Do not claim to control phone functions or access live information unless a tool has done so.'},...localAIHistory.slice(-AI_MEMORY_LIMIT),{role:'user',content:s}];
    reply('One moment. I am processing that locally...',false);
    const result=await localAIEngine.chat.completions.create({messages:history,temperature:0.7,max_tokens:220});
    const answer=result.choices?.[0]?.message?.content?.trim()||'I was unable to generate a response.';
    localAIHistory.push({role:'user',content:s},{role:'assistant',content:answer});
+   localAIHistory=localAIHistory.slice(-AI_MEMORY_LIMIT);
+   saveAIMemory();
    reply(answer,true);return;
   }catch(err){reply('The local AI encountered an error: '+(err?.message||String(err)),false);return}
  }
