@@ -1,0 +1,17 @@
+{
+  "name": "JARVIS Personal Assistant",
+  "short_name": "JARVIS",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#050c16",
+  "theme_color": "#06111f",
+  "description": "A voice-first personal assistant inspired by a cinematic AI.",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
