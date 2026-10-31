@@ -51,6 +51,7 @@ h1{font-size:26px;letter-spacing:.28em;margin:4px 0;color:#dff8ff}#clock{font-va
  <section class="panel"><h2>WEATHER</h2><div class="value" id="weather">Awaiting request</div><div class="muted">Say “weather in Pensacola” or another city.</div></section>
  <section class="panel"><h2>QUICK COMMANDS</h2><div class="muted">“What time is it?”<br>“What is today's date?”<br>“Calculate 18 times 7”<br>“Weather in Miami”<br>“Add reminder call the dentist”</div></section>
  <section class="panel chat"><h2 style="display:flex;align-items:center;justify-content:space-between">COMMUNICATIONS LOG <button class="smallbtn" id="clearChat" type="button">CLEAR</button></h2><div class="log" id="log"></div><div class="controls"><input id="command" placeholder="Type a command..." autocomplete="off"><button id="send">SEND</button><button id="askChatGPT" type="button">SEND TO CHAT</button></div><div class="muted" style="margin-top:7px">ChatGPT Bridge: send typed questions or use Voice to ChatGPT. ChatGPT submission and replies still require your confirmation in ChatGPT.</div></section>
+ <section class="panel"><h2>PERSONAL MEMORY</h2><div class="muted">Saved locally on this device. Example: “Remember my favourite hero is Iron Man.”</div><div class="taskrow" style="margin-top:9px"><input id="memoryInput" placeholder="Remember a fact about me..."><button class="smallbtn" id="saveMemory">SAVE</button></div><ul id="memoryList"></ul><button class="smallbtn" id="clearMemory" type="button">CLEAR PERSONAL MEMORY</button></section>
  <section class="panel"><h2>REMINDERS / TASKS</h2><div class="taskrow"><input id="taskInput" placeholder="Add a task or reminder"><button class="smallbtn" id="addTask">ADD</button></div><ul id="tasks"></ul><div class="muted">Tasks are saved on this device in this browser.</div></section>
 </div>
 <div class="footer">J.A.R.V.I.S. PERSONAL ASSISTANT // LOCAL BUILD 1.0</div>
@@ -82,10 +83,14 @@ function restoreConversation(){
 }
 restoreConversation();
 restoreAIMemory();
+loadPersonalFacts();
+$('saveMemory').onclick=()=>{addPersonalFact($('memoryInput').value);$('memoryInput').value='';};
+$('memoryInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('saveMemory').click()});
+$('clearMemory').onclick=()=>{if(!confirm('Delete all personal facts saved on this device?'))return;personalFacts=[];savePersonalFacts();reply('Personal memory cleared.',false)};
 $('clearChat').onclick=()=>{
  if(!confirm('Clear the conversation saved on this device?'))return;
- log.innerHTML='';localStorage.removeItem(CHAT_KEY);
- addMsg('Conversation cleared. JARVIS is ready for a fresh session.');
+ log.innerHTML='';localStorage.removeItem(CHAT_KEY);clearAIMemory();
+ addMsg('Conversation and local AI context cleared. Personal Memory remains saved separately.');
 };
 function speak(text){if(!('speechSynthesis'in window))return; speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='en-GB';u.rate=.96;u.pitch=.92;speechSynthesis.speak(u);}
 function reply(text,voice=true){addMsg(text);if(voice)speak(text);}
@@ -120,6 +125,22 @@ function saveAIMemory(){
  }
 }
 function clearAIMemory(){localAIHistory=[];try{localStorage.removeItem(AI_MEMORY_KEY)}catch(e){}}
+const PROFILE_KEY='jarvis_personal_profile_v1';
+let personalFacts=[];
+function loadPersonalFacts(){
+ try{const v=JSON.parse(localStorage.getItem(PROFILE_KEY)||'[]');personalFacts=Array.isArray(v)?v.filter(x=>typeof x==='string').slice(0,50):[]}catch(e){personalFacts=[]}
+ renderPersonalFacts();
+}
+function savePersonalFacts(){try{localStorage.setItem(PROFILE_KEY,JSON.stringify(personalFacts))}catch(e){reply('I could not save that memory. Browser storage may be full.',false)}renderPersonalFacts()}
+function renderPersonalFacts(){
+ const list=$('memoryList');if(!list)return;list.innerHTML='';
+ personalFacts.forEach((fact,i)=>{const li=document.createElement('li');const span=document.createElement('span');span.textContent=fact;const del=document.createElement('button');del.textContent='×';del.setAttribute('aria-label','Forget this fact');del.onclick=()=>{personalFacts.splice(i,1);savePersonalFacts()};li.append(span,del);list.append(li)});
+}
+function addPersonalFact(fact){const f=fact.trim();if(!f)return;if(personalFacts.some(x=>x.toLowerCase()===f.toLowerCase())){reply('I already have that in personal memory.',false);return}personalFacts.unshift(f);personalFacts=personalFacts.slice(0,50);savePersonalFacts();reply('I shall remember: '+f,false)}
+function detectRememberCommand(s){
+ const m=s.match(/^(?:jarvis,?s*)?(?:remember|save to memory|remember that)s+(.+?)\s*$/i);
+ return m?m[1].replace(/^thats+/i,'').trim():null;
+}
 const LOCAL_AI_MODEL='Llama-3.2-1B-Instruct-q4f16_1-MLC';
 
 function renderTasks(){$('tasks').innerHTML='';tasks.forEach((t,i)=>{const li=document.createElement('li');const cb=document.createElement('input');cb.type='checkbox';cb.checked=t.done;cb.onchange=()=>{tasks[i].done=cb.checked;saveTasks()};const sp=document.createElement('span');sp.textContent=t.text;if(t.done)sp.style.textDecoration='line-through';const del=document.createElement('button');del.textContent='×';del.setAttribute('aria-label','Delete task');del.onclick=()=>{tasks.splice(i,1);saveTasks()};li.append(cb,sp,del);$('tasks').append(li)})}
@@ -185,7 +206,10 @@ async function handle(raw){
   return;
  }
  addMsg(s,'user');$('command').value='';
+ const remembered=detectRememberCommand(s);
+ if(remembered){addPersonalFact(remembered);return}
  const q=s.toLowerCase();
+ if(/what do you remember about me|what is in your personal memory|list my saved memories/i.test(q)){reply(personalFacts.length?'Here is what I have saved about you: '+personalFacts.join('; '):'I have no personal facts saved yet. You can add one in the Personal Memory panel.',false);return}
  if(/^(hi|hello|hey)\b/.test(q)){reply('Good evening. It is a pleasure to assist you.');return}
  if(q.includes('time')){reply('The current time is '+new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})+'.');return}
  if(q.includes('date')||q.includes('day is it')){reply('Today is '+new Date().toLocaleDateString([], {weekday:'long',year:'numeric',month:'long',day:'numeric'})+'.');return}
@@ -196,7 +220,7 @@ async function handle(raw){
  if(q.includes('help')||q.includes('what can you do')){reply('I can tell you the time and date, look up current weather for a city, calculate arithmetic, and manage a local task list. Full open-ended AI conversation is not connected in this starter build.');return}
  if(localAIEngine){
   try{
-   const history=[{role:'system',content:'You are J.A.R.V.I.S., a helpful, calm, articulate personal assistant. Speak in concise, natural British English. Be honest about limitations. Do not claim to control phone functions or access live information unless a tool has done so.'},...localAIHistory.slice(-AI_MEMORY_LIMIT),{role:'user',content:s}];
+   const history=[{role:'system',content:'You are J.A.R.V.I.S., a helpful, calm, articulate personal assistant. Speak in concise, natural British English. Be honest about limitations. Do not claim to control phone functions or access live information unless a tool has done so. The user profile facts below are trusted saved memories about the user. When asked about them, answer directly using these facts. If a fact is absent, say you do not have it saved; never guess.\nSAVED PERSONAL FACTS:\n'+(personalFacts.length?personalFacts.map((f,i)=>(i+1)+'. '+f).join('\n'):'(No personal facts saved yet.)')},...localAIHistory.slice(-AI_MEMORY_LIMIT),{role:'user',content:s}];
    reply('One moment. I am processing that locally...',false);
    const result=await localAIEngine.chat.completions.create({messages:history,temperature:0.7,max_tokens:220});
    const answer=result.choices?.[0]?.message?.content?.trim()||'I was unable to generate a response.';
