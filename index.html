@@ -83,8 +83,6 @@ function restoreConversation(){
  log.scrollTop=log.scrollHeight;
 }
 restoreConversation();
-restoreAIMemory();
-loadPersonalFacts();
 $('saveMemory').onclick=()=>{addPersonalFact($('memoryInput').value);$('memoryInput').value='';};
 $('memoryInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('saveMemory').click()});
 $('clearMemory').onclick=()=>{if(!confirm('Delete all personal facts saved on this device?'))return;personalFacts=[];savePersonalFacts();reply('Personal memory cleared.',false)};
@@ -138,6 +136,8 @@ function renderPersonalFacts(){
  personalFacts.forEach((fact,i)=>{const li=document.createElement('li');const span=document.createElement('span');span.textContent=fact;const del=document.createElement('button');del.textContent='×';del.setAttribute('aria-label','Forget this fact');del.onclick=()=>{personalFacts.splice(i,1);savePersonalFacts()};li.append(span,del);list.append(li)});
 }
 function addPersonalFact(fact){const f=fact.trim();if(!f)return;if(personalFacts.some(x=>x.toLowerCase()===f.toLowerCase())){reply('I already have that in personal memory.',false);return}personalFacts.unshift(f);personalFacts=personalFacts.slice(0,50);savePersonalFacts();reply('I shall remember: '+f,false)}
+restoreAIMemory();
+loadPersonalFacts();
 function detectRememberCommand(s){
  const m=s.match(/^(?:jarvis,?s*)?(?:remember|save to memory|remember that)s+(.+?)\s*$/i);
  return m?m[1].replace(/^thats+/i,'').trim():null;
