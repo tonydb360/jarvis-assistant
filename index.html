@@ -127,7 +127,7 @@ function saveAIMemory(){
  }
 }
 function clearAIMemory(){localAIHistory=[];try{localStorage.removeItem(AI_MEMORY_KEY)}catch(e){}}
-const PROFILE_KEY='jarvis_personal_profile_v1';
+
 function loadProfile(){try{const p=localStorage.getItem(PROFILE_TEXT_KEY)||'';$('profileInput').value=p;$('profileStatus').textContent=p?'Personal profile loaded.':'No personal facts saved yet.'}catch(e){$('profileStatus').textContent='Storage unavailable.'}}
 function saveProfile(){const p=$('profileInput').value.trim();try{if(p)localStorage.setItem(PROFILE_TEXT_KEY,p);else localStorage.removeItem(PROFILE_TEXT_KEY);$('profileStatus').textContent=p?'Memory saved on this device.':'Profile is empty.'}catch(e){$('profileStatus').textContent='Could not save profile.'}}
 $('saveProfile').onclick=saveProfile;
